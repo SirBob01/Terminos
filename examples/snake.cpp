@@ -1,5 +1,9 @@
+/* Don't forget to place terminos.h and all other source files
+on the same directory as this file. When compiling, link this
+file along with surface.cpp and interface.cpp */
+#include <fstream>
 #include <time.h>
-#include "Terminos/terminos.h"
+#include "terminos.h"
 
 #define UP 'w'
 #define DOWN 's'
@@ -63,23 +67,42 @@ void delay(float seconds) {
 	while(clock() < start+milliseconds);
 }
 
+int load_score(int *high_score) {
+	ifstream save_file("snake.sav", ios::in);
+	if(!save_file.good()) {
+		ofstream write_save;
+		write_save.open("snake.sav", ios::out);
+
+		write_save << 0 << endl;
+		*high_score = 0;
+	}
+	save_file >> *high_score;
+	save_file.close();
+}
+
+void save_score(int score) {
+	ofstream out_file;
+	out_file.open("snake.sav", ios::out);
+	out_file << score << endl;
+}
+
 int main() {
 	srand(time(NULL));
 
 	int size;
 	cout << "Board size (Type a number)? ";
 	cin >> size;
+	cin.ignore();
 
+	char score_card[1024];
 	char direction = RIGHT;
 	char key;
 
-	char score_card[1024];
-	int score = 0;
-	int high_score = 0;
-	int lose = 0;
+	int high_score;
+	load_score(&high_score);
 
-	Interface display;
-	display.set_title("Snake!");
+	int score = 0;
+	int lose = 0;
 
 	char board[1][1] = {{'.'}};
 	Surface surface((char *)board, size, size, 1);
@@ -90,15 +113,16 @@ int main() {
 	Vector2 head = get(&snake, snake.length-1);
 	Vector2 apple = random_position(size, size);
 	Vector2 c1, c2; // For lose condition when snake eats itself
-
-	display.clear();
+	
+	Interface::set_title("Snake!");
+	Interface::clear();
 
 	while(lose == 0) {
-		sprintf(score_card, "High score: %d | Score: %d", score, high_score);
-		display.write_at(score_card, 0, 0);
+		sprintf(score_card, "High score: %d | Score: %d", high_score, score);
+		Interface::write_at(score_card, 0, 0);
 
 		// Controls
-		key = (char)display.get_keydown();
+		key = (char)Interface::get_keydown();
 		if(key == UP && direction != DOWN) {
 			direction = UP;
 		}
@@ -173,17 +197,18 @@ int main() {
 		}
 		surface.set_at('@', apple.x, apple.y);
 
-		display.draw_surface(surface, 3, 2);
+		Interface::draw_surface(surface, 3, 2);
 		surface.refresh();
-		display.cursor_move(0, 0);
+		Interface::cursor_move(0, 0);
 
 		delay(0.1);
 	}
-
-	display.clear();
+	save_score(score);
+	Interface::clear();
 	cout << "Game over!" << "\n";
 	cout << "Press any key to exit...";
 	getch();
-	display.close();
+	Interface::close();
+
 	return 0;
 }
