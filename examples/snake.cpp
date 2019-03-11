@@ -1,9 +1,7 @@
-/* Don't forget to place terminos.h and all other source files
-on the same directory as this file. When compiling, link this
-file along with surface.cpp and interface.cpp */
+#include <iostream>
 #include <fstream>
 #include <time.h>
-#include "terminos.h"
+#include "terminos/terminos.h"
 
 #define UP 'w'
 #define DOWN 's'
@@ -12,8 +10,7 @@ file along with surface.cpp and interface.cpp */
 
 using namespace std;
 
-/* SNAKE! */
-// Snake is a dynamic stack (first in, first out)
+// The snake is simply a dynamic stack
 struct Vector2 {
 	int x, y;
 };
@@ -33,7 +30,6 @@ Vector2 get(Snake *s, int index) {
 }
 
 Vector2 pop(Snake *s) {
-	// FILO
 	Vector2 first = s->arr[0];
 	for(int i = 0; i < s->length-1; i++) {
 		s->arr[i] = s->arr[i+1];
@@ -44,7 +40,7 @@ Vector2 pop(Snake *s) {
 
 Vector2 push(Snake *s, Vector2 cell) {
 	if(s->length >= s->MAX) {
-		s->MAX += 5;
+		s->MAX += (s->length - s->MAX) + 1;
 		realloc(s->arr, s->MAX);
 	}
 	s->length++;
@@ -52,13 +48,8 @@ Vector2 push(Snake *s, Vector2 cell) {
 	return s->arr[s->length-1];
 }
 
-int randrange(int x) {
-	// Generates a random number between 0 and x - 1
-	return rand() % x;
-}
-
 Vector2 random_position(int width, int height) {
-	return {randrange(width), randrange(height)};
+	return {rand() % width, rand() % height};
 }
 
 void delay(float seconds) {
@@ -87,6 +78,7 @@ void save_score(int score) {
 }
 
 int main() {
+	Interface::set_title("Snake!");
 	srand(time(NULL));
 
 	int size;
@@ -94,19 +86,11 @@ int main() {
 	cin >> size;
 	cin.ignore();
 
-	char score_card[1024];
-	char direction = RIGHT;
-	char key;
+	// Generate the board
+	char arr[1][1] = {{'.'}};
+	Surface board((char *)arr, size, size, WHITE, true);
 
-	int high_score;
-	load_score(&high_score);
-
-	int score = 0;
-	int lose = 0;
-
-	char board[1][1] = {{'.'}};
-	Surface surface((char *)board, size, size, 1);
-
+	// Generate the snake
 	Snake snake;
 	push(&snake, {size/2, size/2});
 	
@@ -114,12 +98,26 @@ int main() {
 	Vector2 apple = random_position(size, size);
 	Vector2 c1, c2; // For lose condition when snake eats itself
 	
-	Interface::set_title("Snake!");
+	// Misc. variables	
+	char key, controls[64], score_card[256];
+	char direction = RIGHT;
+	
+	int high_score;
+	load_score(&high_score);
+
+	int score = 0;
+	bool lose = false;
+	
 	Interface::clear();
 
-	while(lose == 0) {
+	while(!lose) {
+		sprintf(controls, "%c%c%c%c to move.", UP, LEFT, DOWN, RIGHT);
 		sprintf(score_card, "High score: %d | Score: %d", high_score, score);
-		Interface::write_at(score_card, 0, 0);
+		
+		Interface::toggle_cursor(false);
+		Interface::set_color(WHITE);
+		Interface::write_at(score_card, 4, 0);
+		Interface::write_at(controls, 4, 1);
 
 		// Controls
 		key = (char)Interface::get_keydown();
@@ -172,7 +170,7 @@ int main() {
 					c1 = get(&snake, i);
 					c2 = get(&snake, j);
 					if(c1.x == c2.x && c1.y == c2.y) {
-						lose = 1;
+						lose = true;
 					}
 				}
 			}
@@ -181,33 +179,34 @@ int main() {
 		// Render
 		for(int i = 0; i < snake.length; i++) {
 			Vector2 cell = get(&snake, i);
-			surface.set_at('O', cell.x, cell.y);
+			board.set_at('O', YELLOW, cell.x, cell.y);
 		}
 		if(direction == UP) {
-			surface.set_at('^', head.x, head.y);
+			board.set_at('^', GREEN, head.x, head.y);
 		}
 		else if(direction == DOWN) {
-			surface.set_at('v', head.x, head.y);
+			board.set_at('v', GREEN, head.x, head.y);
 		}
 		else if(direction == LEFT) {
-			surface.set_at('<', head.x, head.y);
+			board.set_at('<', GREEN, head.x, head.y);
 		}
 		else if(direction == RIGHT) {
-			surface.set_at('>', head.x, head.y);
+			board.set_at('>', GREEN, head.x, head.y);
 		}
-		surface.set_at('@', apple.x, apple.y);
+		board.set_at('@', RED, apple.x, apple.y);
+		Interface::draw_surface(board, 4, 4);
 
-		Interface::draw_surface(surface, 3, 2);
-		surface.refresh();
+		// Refresh console
+		board.refresh();
 		Interface::cursor_move(0, 0);
 
-		delay(0.1);
+		delay(0.05);
 	}
 	save_score(score);
-	Interface::clear();
-	cout << "Game over!" << "\n";
-	cout << "Press any key to exit...";
-	getch();
+	Interface::set_color(WHITE);
+	Interface::write_at("GAME OVER! Press any key to continue...", 4, 2);
+	
+	Interface::pause();
 	Interface::close();
 
 	return 0;

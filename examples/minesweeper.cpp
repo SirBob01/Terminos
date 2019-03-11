@@ -1,15 +1,13 @@
-/* Don't forget to place terminos.h and all other source files
-on the same directory as this file. When compiling, link this
-file along with surface.cpp and interface.cpp */
+#include <iostream>
 #include <time.h>
-#include "terminos.h"
+#include "terminos/terminos.h"
 
 #define MINE '@'
 #define PLAYER '*'
 #define HIDDEN '.'
 #define REVEALED '_'
 #define DIGITS "0123456789"
-#define MINE_CHANCE 10
+#define MINE_PROBABILITY 10
 
 #define UP 'w'
 #define DOWN 's'
@@ -34,7 +32,7 @@ Field generate_map(int width, int height) {
 	for(int j = 0; j < height; j++) {
 		map[j] = (Cell *)malloc(width * sizeof(Cell));
 		for(int i = 0; i < width; i++) {
-			if((int)(rand() % MINE_CHANCE) == 0) {
+			if((int)(rand() % MINE_PROBABILITY) == 0) {
 				map[j][i] = {1, 0, i, j, 0};
 			}
 			else {
@@ -47,8 +45,8 @@ Field generate_map(int width, int height) {
 
 void calculate_adj(Field *field) {
 	// Calculate the number displayed on cell adjacent to one or many mines.
-	for(int y = 0; y < field->height; y++) {
-		for(int x = 0; x < field->width; x++) {
+	for(int x = 0; x < field->width; x++) {
+		for(int y = 0; y < field->height; y++) {
 			// Sides
 			if(x-1 >= 0 && field->map[y][x-1].mine) {
 				field->map[y][x].adj++;
@@ -117,8 +115,8 @@ void reveal(Field *field, int x, int y) {
 }
 
 void reveal_all(Field *field) {
-	for(int y = 0; y < field->height; y++) {
-		for(int x = 0; x < field->width; x++) {
+	for(int x = 0; x < field->width; x++) {
+		for(int y = 0; y < field->height; y++) {
 			field->map[y][x].reveal = 1;
 		}
 	}
@@ -126,18 +124,24 @@ void reveal_all(Field *field) {
 
 void draw_minefield(Field field, Surface surface) {
 	Cell c;
-	for(int j = 0; j < field.height; j++) {
-		for(int i = 0; i < field.width; i++) {
+	for(int i = 0; i < field.width; i++) {
+		for(int j = 0; j < field.height; j++) {
 			c = field.map[j][i];
 			if(c.reveal) {
 				if(c.mine) {
-					surface.set_at(MINE, i, j);
+					surface.set_at(MINE, PURPLE, i, j);
 				}
-				else if(c.adj > 0) {
-					surface.set_at(DIGITS[c.adj], i, j);
+				else if(c.adj == 1) {
+					surface.set_at(DIGITS[c.adj], LIGHT_BLUE, i, j);
+				}
+				else if(c.adj == 2) {
+					surface.set_at(DIGITS[c.adj], LIGHT_GREEN, i, j);
+				}
+				else if(c.adj >= 3) {
+					surface.set_at(DIGITS[c.adj], LIGHT_RED, i, j);
 				}
 				else {
-					surface.set_at(REVEALED, i, j);
+					surface.set_at(REVEALED, LIGHT_YELLOW, i, j);
 				}
 			}
 		}
@@ -145,34 +149,41 @@ void draw_minefield(Field field, Surface surface) {
 }
 
 int main() {
+	Interface::set_title("Minesweeper!");
 	srand(time(NULL));
 
-	char key;
 	int size;
 	cout << "Board size (Type a number)? ";
 	cin >> size;
 	cin.ignore();
 
+	// Generate the board
 	char arr[1][1] = {{HIDDEN}};
-	Surface board((char *)arr, size, size, 1);
+	Surface board((char *)arr, size, size, WHITE, true);
 
-	Field f = generate_map(size, size);
+	// Generate the map
+	Field f = generate_map(board.get_width(), board.get_height());
 	calculate_adj(&f);
 
+	// Misc. variables
+	char key, controlsA[32], controlsB[32];
 	int x = f.width/2;
 	int y = f.height/2;
-	int lose = 0;
+	bool lose = false;
 
-	Interface::set_title("Minesweeper");
 	Interface::clear();
 
-	while(1) {
-		// Controls
-		Interface::cursor_move(4, 0);
-		cout << UP  << LEFT << DOWN << RIGHT << " to move pointer.";
-		Interface::cursor_move(4, 1);
-		cout << ACTIVATE << " to activate cell.";
+	while(!lose) {
+		// Instructions
+		sprintf(controlsA, "%c%c%c%c to move pointer.", UP, LEFT, DOWN, RIGHT);
+		sprintf(controlsB, "%c to activate cell.", ACTIVATE);
 
+		Interface::toggle_cursor(false);
+		Interface::set_color(WHITE);
+		Interface::write_at(controlsA, 4, 0);
+		Interface::write_at(controlsB, 4, 1);
+
+		// Controls
 		key = (char)Interface::get_keydown();
 		if(key == LEFT && x > 0) {
 			x--;
@@ -187,8 +198,9 @@ int main() {
 			y++;
 		}
 		if(key == ACTIVATE) {
+			// Lose condition
 			if(f.map[y][x].mine) {
-				lose = 1;
+				lose = true;
 			}
 			else {
 				reveal(&f, x, y);
@@ -197,24 +209,22 @@ int main() {
 
 		// Render
 		draw_minefield(f, board);
-		board.set_at(PLAYER, x, y);
+		board.set_at(PLAYER, BRIGHT_WHITE, x, y);
 		Interface::draw_surface(board, 4, 4);
-
-		if(lose) {
-			Interface::cursor_move(4, 2);
-			cout << "Game over! Press any key to continue...";
-			reveal_all(&f);
-			draw_minefield(f, board);
-			Interface::draw_surface(board, 4, 4);
-			getch();
-			break;
-		}
 
 		// Refresh console
 		board.refresh();
 		Interface::cursor_move(0, 0);
 	}
+	Interface::set_color(WHITE);
+	Interface::write_at("GAME OVER! Press any key to continue...", 4, 2);
+	
+	reveal_all(&f);
+	draw_minefield(f, board);
+	Interface::draw_surface(board, 4, 4);
 
+	Interface::pause();
 	Interface::close();
+
 	return 0;
 }

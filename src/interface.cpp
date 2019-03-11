@@ -5,59 +5,69 @@
 
 using namespace std;
 
-void strapp(char *string, char c) {
-	int len = strlen(string);
-	string[len] = c;
-	string[len+1] = '\0';
-}
+CONSOLE_SCREEN_BUFFER_INFO info;
 
 void Interface::set_title(LPCSTR title) {
 	SetConsoleTitle(title);
 }
 
-void Interface::cursor_move(int x, int y) {
-	COORD pos = {(short)x, (short)y};
-	SetConsoleCursorPosition(OUTPUT_HANDLE, pos);
+int Interface::get_color() {
+	GetConsoleScreenBufferInfo(OUTPUT_HANDLE, &info);
+	return info.wAttributes;
 }
 
-void Interface::write_at(string s, int x, int y) {
+void Interface::set_color(int color) {
+	SetConsoleTextAttribute(OUTPUT_HANDLE, color);
+}
+
+void Interface::toggle_cursor(bool enable) {
+	CONSOLE_CURSOR_INFO c;
+	GetConsoleCursorInfo(OUTPUT_HANDLE, &c);
+
+	c.dwSize = 1;
+	c.bVisible = false;
+	SetConsoleCursorInfo(OUTPUT_HANDLE, &c);
+}
+
+void Interface::cursor_move(int x, int y) {
+	SetConsoleCursorPosition(OUTPUT_HANDLE, {(short)x, (short)y});
+}
+
+bool Interface::write_at(string s, int x, int y) {
+	int real = s.size();
+
+	// Wastes space with excess DOUBLED memory, but it's safe
+	// Gotta find a better arbitrary safety buffer
+	char *character_buffer = (char *)malloc(real*sizeof(char)*2);
+	strcpy(character_buffer, s.c_str());
+
+	DWORD output_buffer;
+
 	cursor_move(x, y);
-	cout << s;
+	WriteConsole(OUTPUT_HANDLE, character_buffer, real, &output_buffer, NULL);
+	free(character_buffer);
+
+	return real == output_buffer;
 }
 
 void Interface::draw_surface(Surface surface, int x, int y) {
-	char **mask = surface.get_mask();
-
+	if(!surface.is_dirty()) {
+		return;
+	}
 	int width = surface.get_width();
 	int height = surface.get_height();
 	int spacing = surface.get_spacing();
 	
-	/* Collapse board into single string to prevent
-	rapid cursor movement in rendering (ew ugly) */
-	int total = (x + ((spacing + 1) * width)) * height; 
-	char *str = (char *)calloc(total*2, sizeof(char)); // More than enough memory!
-
-	char *s = (char *)calloc(spacing, sizeof(char));
-	char *l = (char *)calloc(x, sizeof(char));
-	for(int i = 0; i < spacing; i++) {
-		s[i] = ' ';
-	}
-	for(int i = 0; i < x; i++) {
-		l[i] = ' ';
-	}
-
-	strcat(str, l);
-	for(int j = 0; j < height; j++) {
-		if(j > 0) {
-			strcat(str, l);
+	char c[2];
+	for(int i = 0; i < width; i++) {
+		for(int j = 0; j < height; j++) {
+			c[0] = surface.get_char(i, j);
+			c[1] = '\0';
+			set_color(surface.get_color(i, j));
+			write_at(c, x+i*(1+spacing), y+j);
 		}
-		for(int i = 0; i < width; i++) {
-			strapp(str, mask[j][i]);
-			strcat(str, s);
-		}
-		strapp(str, '\n');
 	}
-	write_at(str, 0, y);
+	surface.set_dirty(false);
 }
 
 int Interface::get_keydown() {
@@ -66,11 +76,17 @@ int Interface::get_keydown() {
 	}
 }
 
+void Interface::pause() {
+	getch();
+}
+
 void Interface::clear() {
 	system("cls");
 }
 
 void Interface::close() {
+	clear();
 	CloseHandle(INPUT_HANDLE);
 	CloseHandle(OUTPUT_HANDLE);
+	FreeConsole();
 }
