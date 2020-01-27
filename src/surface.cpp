@@ -1,132 +1,143 @@
-#include "terminos.h"
+#include "surface.h"
 
-using namespace std;
+namespace Terminos {
+    Surface::Surface(char *arr, int width, int height, 
+                     int color, bool flat, int spacing) {
+        width_ = width;
+        height_ = height;
 
-Surface::Surface(char *arr, int width, int height, int color, bool is_flat) {
-	base = (Termino *)malloc(width*height*sizeof(Termino));
-	mask = (Termino *)malloc(width*height*sizeof(Termino));
+        base_ = new Termino[width_ * height_];
+        mask_ = new Termino[width_ * height_];
 
-	for(int i = 0; i < width; i++) {
-		for(int j = 0; j < height; j++) {
-			if(is_flat) {
-				base[width*j + i] = {arr[0], color};
-			}
-			else {
-				base[width*j + i] = {arr[width*j + i], color};
-			}
-		}
-	}
+        // Fill the base "surface"
+        for(int i = 0; i < width_; i++) {
+            for(int j = 0; j < height_; j++) {
+                if(flat) {
+                    base_[width_ * j + i] = {
+                        arr[0],
+                        color
+                    };
+                }
+                else {
+                    base_[width_ * j + i] = {
+                        arr[width_ * j + i], 
+                        color
+                    };
+                }
+            }
+        }
 
-	// Copy the contents of the base to mask
-	memcpy(mask, base, width*height*sizeof(Termino));
+        // Fill the mask
+        for(int i = 0; i < width_; i++) {
+            for(int j = 0; j < height_; j++) {
+                set_at(base_[width_ * j + i], i, j);
+            }
+        }
 
-	dimensions[0] = width;
-	dimensions[1] = height;
-	
-	default_color = color;
-	spacing = 1;
+        base_color_ = color;
+        spacing_ = 1;
+        dirty_ = true;
+    }
 
-	dirty = true;
-}
+    Surface::~Surface() {
+        delete[] base_;
+        delete[] mask_;
+    }
 
-Termino *Surface::get_base() {
-	return base;
-}
+    bool Surface::get_dirty() {
+        return dirty_;
+    }
 
-Termino *Surface::get_mask() {
-	return mask;
-}
+    bool Surface::is_in_bounds(int x, int y) {
+        if(x < 0 || x >= width_) {
+            return false;
+        }
+        if(y < 0 || y >= height_) {
+            return false;
+        }
+        return true;
+    }
 
-int Surface::get_width() {
-	return dimensions[0];
-}
+    int Surface::get_width() {
+        return width_;
+    }
 
-int Surface::get_height() {
-	return dimensions[1];
-}
+    int Surface::get_height() {
+        return height_;
+    }
 
-int Surface::get_default_color() {
-	return default_color;
-}
+    Termino Surface::get_at(int x, int y) {
+        return mask_[width_ * y + x];
+    }
 
-int Surface::get_spacing() {
-	return spacing;
-}
+    Termino Surface::get_base_at(int x, int y) {
+        return base_[width_ * y + x];
+    }
 
-char Surface::get_char(int x, int y) {
-	return mask[dimensions[0]*y + x].character;
-}
+    int Surface::get_base_color() {
+        return base_color_;
+    }
 
-int Surface::get_color(int x, int y) {
-	return mask[dimensions[0]*y + x].color;
-}
+    int Surface::get_spacing() {
+        return spacing_;
+    }
 
-bool Surface::is_dirty() {
-	return dirty;
-}
+    void Surface::set_char(char character, int x, int y) {
+        Termino cell = get_at(x, y);
+        if(is_in_bounds(x, y) && cell.character != character) {
+            int index = width_ * y + x;
+            mask_[index].character = character;
+            dirty_ = true;
+        }
+    }
 
-void Surface::set_dirty(bool d) {
-	dirty = d;
-}
+    void Surface::set_color(int color, int x, int y) {
+        Termino cell = get_at(x, y);
+        if(is_in_bounds(x, y) && cell.color != color) {
+            int index = width_ * y + x;
+            mask_[index].color = color;
+            dirty_ = true;
+        }
+    }
 
-bool Surface::within_bounds(int x, int y) {
-	if(x < 0 || x >= dimensions[0]) {
-		return false;
-	}
-	if(y < 0 || y >= dimensions[1]) {
-		return false;
-	}
-	return true;
-}
+    void Surface::set_at(Termino cell, int x, int y) {
+        set_color(cell.color, x, y);
+        set_char(cell.character, x, y);
+    }
 
-void Surface::set_char(char c, int x, int y) {
-	if(within_bounds(x, y) && get_char(x, y) != c) {
-		mask[dimensions[0]*y + x].character = c;
-		set_dirty(true);
-	}
-}
+    void Surface::set_base_color(int color) {
+        base_color_ = color;
+    }
 
-void Surface::set_color(int c, int x, int y) {
-	if(within_bounds(x, y) && get_color(x, y) != c) {
-		mask[dimensions[0]*y + x].color = c;
-		set_dirty(true);
-	}
-}
+    void Surface::set_spacing(int spaces) {
+        spacing_ = spaces;
+    }
 
-void Surface::set_at(char character, int color, int x, int y) {
-	set_color(color, x, y);
-	set_char(character, x, y);
-}
+    void Surface::blit(Surface *source, int x, int y) {
+        // Draw source surface on this surface at (x, y)
+        for(int i = 0; i < source->get_width(); i++) {
+            for(int j = 0; j < source->get_height(); j++) {
+                set_at(
+                    source->get_at(i, j),
+                    x + i,
+                    y + j
+                );
+            }
+        }
+    }
 
-void Surface::set_spacing(int spaces) {
-	spacing = spaces;
-}
+    void Surface::fill(Termino cell) {
+        for(int i = 0; i < width_; i++) {
+            for(int j = 0; j < height_; j++) {
+                set_at(cell, i, j);
+            }
+        }
+    }
 
-void Surface::set_default_color(int color) {
-	default_color = color;
-}
-
-void Surface::blit(Surface source, int x, int y) {
-	// Draw source surface on this surface at (x, y)
-	for(int i = 0; i < source.get_width(); i++) {
-		for(int j = 0; j < source.get_height(); j++) {
-			set_at(source.get_char(i, j), source.get_color(i, j), x+i, y+j);
-		}
-	}
-}
-
-void Surface::reset_colors() {
-	for(int i = 0; i < dimensions[0]; i++) {
-		for(int j = 0; j < dimensions[1]; j++) {
-			set_color(default_color, i, j);
-		}
-	}
-}
-
-void Surface::refresh() {
-	// Free memory
-	free(mask);
-	mask = (Termino *)malloc(dimensions[0]*dimensions[1]*sizeof(Termino));
-	memcpy(mask, base, dimensions[0]*dimensions[1]*sizeof(Termino));
-	set_dirty(true);
+    void Surface::refresh() {
+        for(int i = 0; i < width_ * height_; i++) {
+            mask_[i] = base_[i];
+        }
+        dirty_ = false;
+    }
 }
