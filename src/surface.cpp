@@ -2,50 +2,38 @@
 
 namespace Terminos {
     Surface::Surface(char *arr, int width, int height, 
-                     int color, bool flat, int spacing) {
+                     int color, bool flat) {
         width_ = width;
         height_ = height;
 
         base_ = new Termino[width_ * height_];
         mask_ = new Termino[width_ * height_];
 
-        // Fill the base "surface"
+        // Fill the surface maps
         for(int i = 0; i < width_; i++) {
             for(int j = 0; j < height_; j++) {
+                int index = width_ * j + i;
+                
                 if(flat) {
-                    base_[width_ * j + i] = {
+                    base_[index] = {
                         arr[0],
                         color
                     };
                 }
                 else {
-                    base_[width_ * j + i] = {
-                        arr[width_ * j + i], 
+                    base_[index] = {
+                        arr[index], 
                         color
                     };
                 }
-            }
-        }
-
-        // Fill the mask
-        for(int i = 0; i < width_; i++) {
-            for(int j = 0; j < height_; j++) {
                 set_at(base_[width_ * j + i], i, j);
             }
         }
-
-        base_color_ = color;
-        spacing_ = 1;
-        dirty_ = true;
     }
 
     Surface::~Surface() {
         delete[] base_;
         delete[] mask_;
-    }
-
-    bool Surface::get_dirty() {
-        return dirty_;
     }
 
     bool Surface::is_in_bounds(int x, int y) {
@@ -74,43 +62,23 @@ namespace Terminos {
         return base_[width_ * y + x];
     }
 
-    int Surface::get_base_color() {
-        return base_color_;
-    }
-
-    int Surface::get_spacing() {
-        return spacing_;
-    }
-
     void Surface::set_char(char character, int x, int y) {
-        Termino cell = get_at(x, y);
-        if(is_in_bounds(x, y) && cell.character != character) {
+        if(is_in_bounds(x, y)) {
             int index = width_ * y + x;
             mask_[index].character = character;
-            dirty_ = true;
         }
     }
 
     void Surface::set_color(int color, int x, int y) {
-        Termino cell = get_at(x, y);
-        if(is_in_bounds(x, y) && cell.color != color) {
+        if(is_in_bounds(x, y)) {
             int index = width_ * y + x;
             mask_[index].color = color;
-            dirty_ = true;
         }
     }
 
     void Surface::set_at(Termino cell, int x, int y) {
         set_color(cell.color, x, y);
         set_char(cell.character, x, y);
-    }
-
-    void Surface::set_base_color(int color) {
-        base_color_ = color;
-    }
-
-    void Surface::set_spacing(int spaces) {
-        spacing_ = spaces;
     }
 
     void Surface::blit(Surface *source, int x, int y) {
@@ -127,10 +95,8 @@ namespace Terminos {
     }
 
     void Surface::fill(Termino cell) {
-        for(int i = 0; i < width_; i++) {
-            for(int j = 0; j < height_; j++) {
-                set_at(cell, i, j);
-            }
+        for(int i = 0; i < width_ * height_; i++) {
+            mask_[i] = cell;
         }
     }
 
@@ -138,6 +104,5 @@ namespace Terminos {
         for(int i = 0; i < width_ * height_; i++) {
             mask_[i] = base_[i];
         }
-        dirty_ = false;
     }
 }

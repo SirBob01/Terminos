@@ -1,213 +1,182 @@
 #include <iostream>
+#include <deque>
 #include <fstream>
-#include <time.h>
-#include "terminos/terminos.h"
+#include <ctime>
+#include <terminos/terminos.h>
 
 #define UP 'w'
 #define DOWN 's'
 #define LEFT 'a'
 #define RIGHT 'd'
 
-using namespace std;
+void delay(int ms) { 
+    clock_t start_time = clock(); 
+   
+    while (clock() < start_time + ms); 
+}
 
-// The snake is simply a dynamic stack
+// The snake is simply a dynamic queue
 struct Vector2 {
-	int x, y;
+    int x, y;
 };
-
-struct Snake {
-	int length = 0;
-	int MAX = 1;
-	Vector2 *arr = (Vector2 *)malloc(MAX * sizeof(Vector2));
-};
-
-Vector2 get(Snake *s, int index) {
-	if(index >= s->length) {
-		cout << "Index of range!" << "\n";
-		return {-1, -1};
-	}
-	return s->arr[index];
-}
-
-Vector2 pop(Snake *s) {
-	Vector2 first = s->arr[0];
-	for(int i = 0; i < s->length-1; i++) {
-		s->arr[i] = s->arr[i+1];
-	}
-	s->length--;
-	return first;
-}
-
-Vector2 push(Snake *s, Vector2 cell) {
-	if(s->length >= s->MAX) {
-		s->MAX += (s->length - s->MAX) + 1;
-		realloc(s->arr, s->MAX);
-	}
-	s->length++;
-	s->arr[s->length-1] = cell;
-	return s->arr[s->length-1];
-}
 
 Vector2 random_position(int width, int height) {
-	return {rand() % width, rand() % height};
+    return {rand() % width, rand() % height};
 }
 
-void delay(float seconds) {
-	int milliseconds = 1000*seconds;
-	clock_t start = clock();
-	while(clock() < start+milliseconds);
-}
+void load_score(int *high_score) {
+    std::ifstream save_file("snake.sav", std::ios::in);
+    if(!save_file.good()) {
+        std::ofstream write_save;
+        write_save.open("snake.sav", std::ios::out);
 
-int load_score(int *high_score) {
-	ifstream save_file("snake.sav", ios::in);
-	if(!save_file.good()) {
-		ofstream write_save;
-		write_save.open("snake.sav", ios::out);
-
-		write_save << 0 << endl;
-		*high_score = 0;
-	}
-	save_file >> *high_score;
-	save_file.close();
+        write_save << 0 << std::endl;
+        *high_score = 0;
+    }
+    save_file >> *high_score;
+    save_file.close();
 }
 
 void save_score(int score) {
-	ofstream out_file;
-	out_file.open("snake.sav", ios::out);
-	out_file << score << endl;
+    std::ofstream out_file;
+    out_file.open("snake.sav", std::ios::out);
+    out_file << score << std::endl;
 }
 
-int main() {
-	Interface::set_title("Snake!");
-	srand(time(NULL));
+int main(int argc, char **argv) {
+    Terminos::Interface console;
+    console.set_title("Snake!");
 
-	int size;
-	cout << "Board size (Type a number)? ";
-	cin >> size;
-	cin.ignore();
+    srand(time(NULL));
 
-	// Generate the board
-	char arr[1][1] = {{'.'}};
-	Surface board((char *)arr, size, size, WHITE, true);
+    int size;
+    console.write_at("Board size (Type a number)? ", 0, 0);
+    std::cin >> size;
+    std::cin.ignore();
 
-	// Generate the snake
-	Snake snake;
-	push(&snake, {size/2, size/2});
-	
-	Vector2 head = get(&snake, snake.length-1);
-	Vector2 apple = random_position(size, size);
-	Vector2 c1, c2; // For lose condition when snake eats itself
-	
-	// Misc. variables	
-	char key, controls[64], score_card[256];
-	char direction = RIGHT;
-	
-	int high_score;
-	load_score(&high_score);
+    // Generate the board
+    char arr[1] = {'.'};
+    Terminos::Surface board(arr, size, size, Terminos::WHITE, true);
 
-	int score = 0;
-	bool lose = false;
-	
-	Interface::clear();
+    // Generate the snake
+    std::deque<Vector2> snake;
+    snake.push_back({size/2, size/2});
 
-	while(!lose) {
-		sprintf(controls, "%c%c%c%c to move.", UP, LEFT, DOWN, RIGHT);
-		sprintf(score_card, "High score: %d | Score: %d", high_score, score);
-		
-		Interface::toggle_cursor(false);
-		Interface::set_color(WHITE);
-		Interface::write_at(score_card, 4, 0);
-		Interface::write_at(controls, 4, 1);
+    Vector2 head = snake.front();
+    Vector2 apple = random_position(size, size);
+    Vector2 c1, c2; // For lose condition when snake eats itself
+    
+    // Misc. variables
+    char controls[64], score_card[256];
+    char direction = RIGHT;
+    
+    int high_score;
+    load_score(&high_score);
 
-		// Controls
-		key = (char)Interface::get_keydown();
-		if(key == UP && direction != DOWN) {
-			direction = UP;
-		}
-		else if(key == DOWN && direction != UP) {
-			direction = DOWN;
-		}
-		else if(key == LEFT && direction != RIGHT) {
-			direction = LEFT;
-		}
-		else if(key == RIGHT && direction != LEFT) {
-			direction = RIGHT;
-		}
+    int score = 0;
+    bool lose = false;
 
-		// Movement
-		if(direction == UP) {
-			head = push(&snake, {head.x, head.y-1});
-		}
-		else if(direction == DOWN) {
-			head = push(&snake, {head.x, head.y+1});
-		}
-		else if(direction == LEFT) {
-			head = push(&snake, {head.x-1, head.y});
-		}
-		else if(direction == RIGHT) {
-			head = push(&snake, {head.x+1, head.y});
-		}
+    console.clear();
 
-		// Score condition
-		if(head.x == apple.x && head.y == apple.y) {
-			score++;
-			apple = random_position(size, size);
-		}
-		else {
-			pop(&snake);
-		}
+    while(!lose) {
+        sprintf(controls, "%c%c%c%c to move.", UP, LEFT, DOWN, RIGHT);
+        sprintf(score_card, "High score: %d | Score: %d", high_score, score);
+        
+        console.toggle_cursor(false);
+        console.set_color(Terminos::WHITE);
+        console.write_at(score_card, 4, 0);
+        console.write_at(controls, 4, 1);
 
-		// Lose conditions
-		if(head.x < 0 || head.x >= size) {
-			lose = 1;
-		}
-		else if(head.y < 0 || head.y >= size) {
-			lose = 1;
-		}
-		if(snake.length > 1) {
-			for(int i = 0; i < snake.length; i++) {
-				for(int j = i + 1; j < snake.length; j++) {
-					c1 = get(&snake, i);
-					c2 = get(&snake, j);
-					if(c1.x == c2.x && c1.y == c2.y) {
-						lose = true;
-					}
-				}
-			}
-		} 
+        // Controls
+        char key_press = console.get_keydown();
+        if(key_press == UP && direction != DOWN) {
+            direction = UP;
+        }
+        else if(key_press == DOWN && direction != UP) {
+            direction = DOWN;
+        }
+        else if(key_press == LEFT && direction != RIGHT) {
+            direction = LEFT;
+        }
+        else if(key_press == RIGHT && direction != LEFT) {
+            direction = RIGHT;
+        }
 
-		// Render
-		for(int i = 0; i < snake.length; i++) {
-			Vector2 cell = get(&snake, i);
-			board.set_at('O', YELLOW, cell.x, cell.y);
-		}
-		if(direction == UP) {
-			board.set_at('^', GREEN, head.x, head.y);
-		}
-		else if(direction == DOWN) {
-			board.set_at('v', GREEN, head.x, head.y);
-		}
-		else if(direction == LEFT) {
-			board.set_at('<', GREEN, head.x, head.y);
-		}
-		else if(direction == RIGHT) {
-			board.set_at('>', GREEN, head.x, head.y);
-		}
-		board.set_at('@', RED, apple.x, apple.y);
-		Interface::draw_surface(board, 4, 4);
+        // Movement
+        if(direction == UP) {
+            head = {head.x, head.y-1};
+        }
+        else if(direction == DOWN) {
+            head = {head.x, head.y+1};
+        }
+        else if(direction == LEFT) {
+            head = {head.x-1, head.y};
+        }
+        else if(direction == RIGHT) {
+            head = {head.x+1, head.y};
+        }
+        snake.push_back(head);
 
-		// Refresh console
-		board.refresh();
-		Interface::cursor_move(0, 0);
+        // Score condition
+        if(head.x == apple.x && head.y == apple.y) {
+            score++;
+            apple = random_position(size, size);
+        }
+        else {
+            snake.pop_front();
+        }
 
-		delay(0.05);
-	}
-	save_score(score);
-	Interface::set_color(WHITE);
-	Interface::write_at("GAME OVER! Press any key to continue...", 4, 2);
-	
-	Interface::pause();
-	Interface::close();
+        // Lose conditions
+        if(head.x < 0 || head.x >= size) {
+            lose = 1;
+        }
+        else if(head.y < 0 || head.y >= size) {
+            lose = 1;
+        }
+        if(snake.size() > 1) {
+            for(int i = 0; i < snake.size(); i++) {
+                for(int j = i + 1; j < snake.size(); j++) {
+                    c1 = snake[i];
+                    c2 = snake[j];
+                    if(c1.x == c2.x && c1.y == c2.y) {
+                        lose = true;
+                    }
+                }
+            }
+        } 
 
-	return 0;
+        // Render
+        for(int i = 0; i < snake.size(); i++) {
+            Vector2 cell = snake[i];
+            board.set_at({'O', Terminos::YELLOW}, cell.x, cell.y);
+        }
+        if(direction == UP) {
+            board.set_at({'^', Terminos::GREEN}, head.x, head.y);
+        }
+        else if(direction == DOWN) {
+            board.set_at({'v', Terminos::GREEN}, head.x, head.y);
+        }
+        else if(direction == LEFT) {
+            board.set_at({'<', Terminos::GREEN}, head.x, head.y);
+        }
+        else if(direction == RIGHT) {
+            board.set_at({'>', Terminos::GREEN}, head.x, head.y);
+        }
+        board.set_at({'@', Terminos::RED}, apple.x, apple.y);
+        console.draw_surface(&board, 4, 4);
+
+        // Refresh console
+        board.refresh();
+        console.cursor_move(0, 0);
+
+        delay(100);
+    }
+    save_score(score);
+    console.set_color(Terminos::WHITE);
+    console.write_at("GAME OVER! Press any key to continue...", 4, 2);
+    
+    console.pause();
+    console.close();
+
+    return 0;
 }

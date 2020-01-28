@@ -18,6 +18,9 @@ namespace Terminos {
     }
 
     void Interface::set_color(int color) {
+        if(get_color() == color) {
+            return;
+        }
         SetConsoleTextAttribute(OUTPUT_HANDLE, color);
     }
 
@@ -53,27 +56,46 @@ namespace Terminos {
         return input_length == output_length;
     }
 
-    void Interface::draw_surface(Surface *surface, int x, int y) {
-        bool dirty = surface->get_dirty();
-        if(!dirty) {
-            return;
-        }
-
-        int width = surface->get_width();
-        int height = surface->get_height();
-        int spacing = surface->get_spacing();
-        
+    void Interface::draw_termino(Termino cell, int x, int y) {
         std::string str;
+        str = cell.character;
+        set_color(cell.color);
+        write_at(str, x, y);
+    }
+
+    void Interface::draw_surface(Surface *surface, int x, int y, 
+                                 int spacing) {
+        SHORT width = surface->width_ * (1 + spacing);
+        SHORT height = surface->height_;
+
+        CHAR_INFO map[width * height];
         for(int i = 0; i < width; i++) {
             for(int j = 0; j < height; j++) {
-                Termino cell = surface->get_at(i, j);
-                str = cell.character;
-                set_color(cell.color);
-                write_at(str, x + i * (1 + spacing), y + j);
+                Termino cell;
+                if(spacing && i%(1 + spacing) == 0) {
+                    cell = {' ', 0};
+                }
+                else {
+                    cell = surface->get_at(i / (1 + spacing), j);
+                }
+                map[width * j + i].Char.AsciiChar = cell.character;
+                map[width * j + i].Attributes = cell.color;
             }
         }
+        SMALL_RECT dest = {
+            static_cast<SHORT>(x), 
+            static_cast<SHORT>(y), 
+            static_cast<SHORT>(width+x),
+            static_cast<SHORT>(height+y)
+        };
+        WriteConsoleOutput(
+            OUTPUT_HANDLE, 
+            map, 
+            {width, height}, 
+            {0, 0},
+            &dest
+        );
         surface->refresh();
-        cursor_move(0, 0);
     }
 
     char Interface::get_keydown() {

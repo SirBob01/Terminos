@@ -23,8 +23,11 @@ namespace Terminos {
         static void cursor_move(int x, int y);
         
         static bool write_at(std::string s, int x, int y);
+
+        static void draw_termino(Termino cell, int x, int y);
         
-        static void draw_surface(Surface *surface, int x, int y);
+        static void draw_surface(Surface *surface, int x, int y, 
+                                 int spacing=1);
 
         static char get_keydown();
         

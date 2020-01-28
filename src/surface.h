@@ -38,20 +38,12 @@ namespace Terminos {
 
         int width_;
         int height_;
-        
-        int base_color_;
-        int spacing_;
-
-        bool dirty_;
-
-        bool get_dirty();
 
         friend class Interface;
 
     public:
-
         Surface(char *arr, int width, int height, 
-                int color, bool flat=false, int spacing=1);
+                int color, bool flat=false);
         ~Surface();
 
         bool is_in_bounds(int x, int y);
@@ -64,19 +56,11 @@ namespace Terminos {
 
         Termino get_base_at(int x, int y);
 
-        int get_base_color();
-
-        int get_spacing();
-
         void set_char(char character, int x, int y);
         
         void set_color(int color, int x, int y);
 
         void set_at(Termino cell, int x, int y);
-        
-        void set_base_color(int color);
-        
-        void set_spacing(int spaces);
         
         void blit(Surface *source, int x, int y);
         
